@@ -2,13 +2,18 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"pokedexcli/api"
+	"pokedexcli/internal/pokecache"
 	"strings"
+	"time"
 )
 
 func main() {
+	c := pokecache.NewCache(10 * time.Second)
+	defer c.Stop()
 	config := &configUrl{
 		url:      "https://pokeapi.co/api/v2/location-area/",
 		next:     "",
@@ -41,27 +46,41 @@ func main() {
 
 		switch command.name {
 		case "map":
-			fetchAndPrint(command, command.config.url)
+			fetchAndPrint(command, command.config.url, c)
 		case "mapb":
 			if command.config.previous == "" {
 				fmt.Println("You're on the first page")
 				continue
 			}
-			fetchAndPrint(command, command.config.previous)
+			fetchAndPrint(command, command.config.previous, c)
 		default:
 			command.callback()
 		}
 	}
 }
 
-func fetchAndPrint(command *cliCommand, url string) {
+func fetchAndPrint(command *cliCommand, url string, cache *pokecache.Cache) {
+	if data, ok := cache.Get(url); ok {
+		var resp api.LocationAreaResponse
+		if err := json.Unmarshal(data, &resp); err == nil {
+			printResults(command, &resp)
+			return
+		}
+	}
+
 	resp, err := api.MakeRequest(url)
 	if err != nil {
 		fmt.Println("Error making request:", err)
 		return
 	}
 
-	// Update config
+	raw, _ := json.Marshal(resp)
+	cache.Add(url, raw)
+
+	printResults(command, &resp)
+}
+
+func printResults(command *cliCommand, resp *api.LocationAreaResponse) {
 	if resp.Next != "" {
 		command.config.url = resp.Next
 	}
