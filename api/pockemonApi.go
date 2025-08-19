@@ -28,7 +28,6 @@ func MakeRequest(url string) (LocationAreaResponse, error) {
 		return LocationAreaResponse{}, err
 	}
 
-	// debug output (optional, remove if you just want to return the data)
 	if len(resp.Results) > 0 {
 		fmt.Printf("First result: %s (%s)\n", resp.Results[0].Name, resp.Results[0].URL)
 	}
